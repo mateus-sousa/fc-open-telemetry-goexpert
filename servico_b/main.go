@@ -93,6 +93,7 @@ func main() {
 func getWeather(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
@@ -100,18 +101,21 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	var cep CEP
 	err = json.Unmarshal(body, &cep)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	req, err := http.NewRequestWithContext(r.Context(), "GET", fmt.Sprintf("http://viacep.com.br/ws/%s/json/", cep.Number), nil)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		log.Println(err)
 		fmt.Println("deu ruim 1")
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -119,6 +123,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	}
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
+		log.Println(err)
 		fmt.Println("deu ruim 2")
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -127,6 +132,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	var responseViaCEP ResponseViaCEP
 	err = json.Unmarshal(resBody, &responseViaCEP)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
@@ -139,18 +145,21 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 			responseViaCEP.Localidade,
 		), nil)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	res, err = http.DefaultClient.Do(req)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	resBody, err = io.ReadAll(res.Body)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
@@ -158,6 +167,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	var responseWeather ResponseWeather
 	err = json.Unmarshal(resBody, &responseWeather)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return

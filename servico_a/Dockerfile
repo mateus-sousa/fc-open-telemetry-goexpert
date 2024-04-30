@@ -1,0 +1,11 @@
+FROM golang:1.21
+
+WORKDIR /app
+
+COPY . .
+
+RUN go build -o service_a .
+
+EXPOSE 8080
+
+CMD [ "./service_a"]

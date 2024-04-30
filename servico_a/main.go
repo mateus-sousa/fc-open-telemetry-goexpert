@@ -39,8 +39,10 @@ func main() {
 }
 
 func getWeather(w http.ResponseWriter, r *http.Request) {
+	log.Println("init request")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
@@ -48,36 +50,52 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	var cep CEP
 	err = json.Unmarshal(body, &cep)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	err = validateCEP(cep)
 	if err != nil {
+		log.Println(err)
+
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		w.Write([]byte("invalid zipcode"))
 		return
 	}
+	log.Println("request to service B")
 	req, err := http.NewRequestWithContext(context.Background(), "POST", fmt.Sprintf("%s/getweather", cfg.BaseUrl), bytes.NewBuffer(body))
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
+	log.Println("request to service B susccesfully")
+
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 	var responseHTTP *ResponseHTTP
 	err = json.Unmarshal(resBody, &responseHTTP)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	log.Println("go to handler response")
 	handleResponse(w, res.StatusCode, responseHTTP)
 }
 

@@ -1,0 +1,16 @@
+version: "3"
+services:
+  service-a:
+    ports:
+      - "8080:8080"
+    build:
+      context: ./servico_a
+    environment:
+      BASE_URL: http://service-b:8081
+  service-b:
+    ports:
+      - "8081:8081"
+    build:
+      context: ./servico_b
+    environment:
+      WEATHER_TOKEN: 'b31e34e7d8d842b4849182050243004'
