@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-chi/chi"
+	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_a/config"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -22,7 +24,14 @@ type ResponseHTTP struct {
 	TempK float64 `json:"temp_K"`
 }
 
+var cfg *config.Conf
+
 func main() {
+	var err error
+	cfg, err = config.LoadConfig(".")
+	if err != nil {
+		log.Fatal(err)
+	}
 	r := chi.NewRouter()
 	r.Post("/getweather", getWeather)
 	fmt.Println("listening in port :8080")
@@ -49,7 +58,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("invalid zipcode"))
 		return
 	}
-	req, err := http.NewRequestWithContext(context.Background(), "POST", "http://localhost:8081/getweather", bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", fmt.Sprintf("%s/getweather", cfg.BaseUrl), bytes.NewBuffer(body))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -67,8 +76,6 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	fmt.Println(res.StatusCode)
-	fmt.Println(string(resBody))
 	var responseHTTP *ResponseHTTP
 	err = json.Unmarshal(resBody, &responseHTTP)
 	handleResponse(w, res.StatusCode, responseHTTP)
