@@ -17,7 +17,7 @@ type CEP struct {
 func main() {
 	r := chi.NewRouter()
 	r.Post("/getweather", getWeather)
-	http.ListenAndServe(":8000", r)
+	http.ListenAndServe(":8080", r)
 }
 
 func getWeather(w http.ResponseWriter, r *http.Request) {
