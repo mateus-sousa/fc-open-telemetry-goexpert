@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/go-chi/chi"
 	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_b/config"
@@ -105,16 +104,10 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	err = validateCEP(cep)
-	if err != nil {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write([]byte("invalid zipcode"))
-		return
-	}
 	req, err := http.NewRequestWithContext(r.Context(), "GET", fmt.Sprintf("http://viacep.com.br/ws/%s/json/", cep.Number), nil)
 	if err != nil {
-		//w.WriteHeader(http.StatusInternalServerError)
-		//w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
 		return
 	}
 	res, err := http.DefaultClient.Do(req)
@@ -145,7 +138,6 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 			cfg.WeatherToken,
 			responseViaCEP.Localidade,
 		), nil)
-
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -201,11 +193,5 @@ func handleResponse(w http.ResponseWriter, statusCode int, response *ResponseHTT
 		w.Write([]byte("can not find zipcode"))
 		return
 	}
-}
-
-func validateCEP(cep CEP) error {
-	if len(cep.Number) != 8 {
-		return errors.New("cep is invalid")
-	}
-	return nil
+	w.WriteHeader(http.StatusInternalServerError)
 }

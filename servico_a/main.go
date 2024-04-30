@@ -5,18 +5,27 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/go-chi/chi"
 	"io"
 	"net/http"
 )
 
 type CEP struct {
-	number string
+	Number string `json:"cep"`
+}
+
+type ResponseHTTP struct {
+	City  string  `json:"city"`
+	TempC float64 `json:"temp_C"`
+	TempF float64 `json:"temp_F"`
+	TempK float64 `json:"temp_K"`
 }
 
 func main() {
 	r := chi.NewRouter()
 	r.Post("/getweather", getWeather)
+	fmt.Println("listening in port :8080")
 	http.ListenAndServe(":8080", r)
 }
 
@@ -40,7 +49,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("invalid zipcode"))
 		return
 	}
-	req, err := http.NewRequestWithContext(context.Background(), "POST", "localhost:8081/getweather", bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", "http://localhost:8081/getweather", bytes.NewBuffer(body))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -58,13 +67,23 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	handleResponse(w, res.StatusCode, resBody)
+	fmt.Println(res.StatusCode)
+	fmt.Println(string(resBody))
+	var responseHTTP *ResponseHTTP
+	err = json.Unmarshal(resBody, &responseHTTP)
+	handleResponse(w, res.StatusCode, responseHTTP)
 }
 
-func handleResponse(w http.ResponseWriter, statusCode int, resBody []byte) {
+func handleResponse(w http.ResponseWriter, statusCode int, response *ResponseHTTP) {
 	if statusCode == http.StatusOK {
+		responseBytes, err := json.Marshal(response)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(resBody)
+		w.Write(responseBytes)
 		return
 	} else if statusCode == http.StatusUnprocessableEntity {
 		w.WriteHeader(http.StatusUnprocessableEntity)
@@ -75,10 +94,10 @@ func handleResponse(w http.ResponseWriter, statusCode int, resBody []byte) {
 		w.Write([]byte("can not find zipcode"))
 		return
 	}
+	w.WriteHeader(http.StatusInternalServerError)
 }
-
 func validateCEP(cep CEP) error {
-	if len(cep.number) != 8 {
+	if len(cep.Number) != 8 {
 		return errors.New("cep is invalid")
 	}
 	return nil
