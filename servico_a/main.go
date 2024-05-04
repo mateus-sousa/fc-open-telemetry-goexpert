@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/go-chi/chi"
 	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_a/config"
+	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_a/infra"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"log"
 	"net/http"
@@ -26,19 +29,30 @@ type ResponseHTTP struct {
 
 var cfg *config.Conf
 
+var tracer trace.Tracer
+
 func main() {
+	ot := infra.NewOpenTel()
+	ot.ServiceName = "GoApp"
+	ot.ServiceVersion = "0.1"
+	ot.ExporterEndpoint = "http://localhost:9411/api/v2/spans"
+	tracer = ot.GetTracer()
 	var err error
 	cfg, err = config.LoadConfig(".")
 	if err != nil {
 		log.Fatal(err)
 	}
 	r := chi.NewRouter()
+	r.Use(otelmux.Middleware(ot.ServiceName))
 	r.Post("/getweather", getWeather)
+	fmt.Println("service B url:", cfg.BaseUrl)
 	fmt.Println("listening in port :8080")
 	http.ListenAndServe(":8080", r)
 }
 
 func getWeather(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx, validateZipCode := tracer.Start(ctx, "validate-zipcode")
 	log.Println("init request")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -58,13 +72,15 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	err = validateCEP(cep)
 	if err != nil {
 		log.Println(err)
-
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		w.Write([]byte("invalid zipcode"))
 		return
 	}
+	validateZipCode.End()
+	ctx, requestServiceB := tracer.Start(ctx, "request-service-b")
 	log.Println("request to service B")
-	req, err := http.NewRequestWithContext(context.Background(), "POST", fmt.Sprintf("%s/getweather", cfg.BaseUrl), bytes.NewBuffer(body))
+	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/getweather", cfg.BaseUrl), bytes.NewBuffer(body))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -72,14 +88,15 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Println("request to service B susccesfully")
-
-	res, err := http.DefaultClient.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
+	requestServiceB.End()
+	ctx, httpResponseShow := tracer.Start(ctx, "http-response-show")
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Println(err)
@@ -97,6 +114,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("go to handler response")
 	handleResponse(w, res.StatusCode, responseHTTP)
+	httpResponseShow.End()
 }
 
 func handleResponse(w http.ResponseWriter, statusCode int, response *ResponseHTTP) {

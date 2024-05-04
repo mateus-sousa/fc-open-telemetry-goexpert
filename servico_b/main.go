@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"github.com/go-chi/chi"
 	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_b/config"
+	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_b/infra"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"log"
 	"net/http"
@@ -77,20 +80,29 @@ type ResponseHTTP struct {
 }
 
 var cfg *config.Conf
+var tracer trace.Tracer
 
 func main() {
+	ot := infra.NewOpenTel()
+	ot.ServiceName = "GoApp2"
+	ot.ServiceVersion = "0.1"
+	ot.ExporterEndpoint = "http://localhost:9411/api/v2/spans"
+	tracer = ot.GetTracer()
 	var err error
 	cfg, err = config.LoadConfig(".")
 	if err != nil {
 		log.Fatal(err)
 	}
 	r := chi.NewRouter()
+	r.Use(otelmux.Middleware(ot.ServiceName))
 	r.Post("/getweather", getWeather)
 	fmt.Println("listening in port :8081")
 	http.ListenAndServe(":8081", r)
 }
 
 func getWeather(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx, doAll := tracer.Start(ctx, "do-all")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
@@ -106,7 +118,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	req, err := http.NewRequestWithContext(r.Context(), "GET", fmt.Sprintf("http://viacep.com.br/ws/%s/json/", cep.Number), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://viacep.com.br/ws/%s/json/", cep.Number), nil)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -138,7 +150,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req, err = http.NewRequestWithContext(
-		r.Context(),
+		ctx,
 		"GET",
 		fmt.Sprintf("http://api.weatherapi.com/v1/current.json?key=%s&q=%s",
 			cfg.WeatherToken,
@@ -181,6 +193,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		TempK: tempK,
 	}
 	handleResponse(w, res.StatusCode, &response)
+	doAll.End()
 }
 
 func handleResponse(w http.ResponseWriter, statusCode int, response *ResponseHTTP) {
