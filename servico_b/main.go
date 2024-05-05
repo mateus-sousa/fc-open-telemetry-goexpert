@@ -103,7 +103,7 @@ func main() {
 
 func getWeather(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ctx, doAll := tracer.Start(ctx, "do-all")
+	ctx, requestViaCep := tracer.Start(ctx, "request-via-cep")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
@@ -129,15 +129,15 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Println(err)
-		fmt.Println("deu ruim 1")
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
+	requestViaCep.End()
+	ctx, requestWeatherApi := tracer.Start(ctx, "request-weather-api")
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Println(err)
-		fmt.Println("deu ruim 2")
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
@@ -170,6 +170,8 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
+	requestWeatherApi.End()
+	ctx, httpResponseShow := tracer.Start(ctx, "http-response-show")
 	resBody, err = io.ReadAll(res.Body)
 	if err != nil {
 		log.Println(err)
@@ -194,7 +196,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		TempK: tempK,
 	}
 	handleResponse(w, res.StatusCode, &response)
-	doAll.End()
+	httpResponseShow.End()
 }
 
 func handleResponse(w http.ResponseWriter, statusCode int, response *ResponseHTTP) {
