@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi"
+	"github.com/gorilla/mux"
 	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_b/config"
 	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_b/infra"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
@@ -83,19 +83,20 @@ var cfg *config.Conf
 var tracer trace.Tracer
 
 func main() {
-	ot := infra.NewOpenTel()
-	ot.ServiceName = "GoApp2"
-	ot.ServiceVersion = "0.1"
-	ot.ExporterEndpoint = "http://localhost:9411/api/v2/spans"
-	tracer = ot.GetTracer()
 	var err error
 	cfg, err = config.LoadConfig(".")
 	if err != nil {
 		log.Fatal(err)
 	}
-	r := chi.NewRouter()
+	ot := infra.NewOpenTel()
+	ot.ServiceName = "Service B"
+	ot.ServiceVersion = "1"
+	ot.ExporterEndpoint = fmt.Sprintf("%s/api/v2/spans", cfg.ExporterUrl)
+	tracer = ot.GetTracer()
+	r := mux.NewRouter()
 	r.Use(otelmux.Middleware(ot.ServiceName))
-	r.Post("/getweather", getWeather)
+	r.HandleFunc("/getweather", getWeather)
+	fmt.Println("exporter url:", cfg.ExporterUrl)
 	fmt.Println("listening in port :8081")
 	http.ListenAndServe(":8081", r)
 }

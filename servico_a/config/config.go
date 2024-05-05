@@ -3,7 +3,8 @@ package config
 import "github.com/spf13/viper"
 
 type Conf struct {
-	BaseUrl string `mapstructure:"BASE_URL"`
+	BaseUrl     string `mapstructure:"BASE_URL"`
+	ExporterUrl string `mapstructure:"EXPORTER_URL"`
 }
 
 func LoadConfig(path string) (*Conf, error) {

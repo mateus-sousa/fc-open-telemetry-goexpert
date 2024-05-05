@@ -38,7 +38,7 @@ func (o *OpenTel) GetTracer() trace.Tracer {
 		sdktrace.WithSpanProcessor(batcher),
 		sdktrace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("full-cycle-platform-2"),
+			semconv.ServiceNameKey.String("service-b"),
 		)),
 	)
 	otel.SetTracerProvider(tp)

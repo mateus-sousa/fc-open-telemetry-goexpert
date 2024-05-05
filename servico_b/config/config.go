@@ -4,6 +4,7 @@ import "github.com/spf13/viper"
 
 type Conf struct {
 	WeatherToken string `mapstructure:"WEATHER_TOKEN"`
+	ExporterUrl  string `mapstructure:"EXPORTER_URL"`
 }
 
 func LoadConfig(path string) (*Conf, error) {
