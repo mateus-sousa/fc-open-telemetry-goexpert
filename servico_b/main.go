@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 )
 
 type CEP struct {
@@ -150,13 +151,12 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	req, err = http.NewRequestWithContext(
-		ctx,
-		"GET",
-		fmt.Sprintf("http://api.weatherapi.com/v1/current.json?key=%s&q=%s",
-			cfg.WeatherToken,
-			responseViaCEP.Localidade,
-		), nil)
+	weatherUrl := fmt.Sprintf("http://api.weatherapi.com/v1/current.json?key=%s&q=%s",
+		cfg.WeatherToken,
+		url.QueryEscape(responseViaCEP.Localidade),
+	)
+	fmt.Println(weatherUrl)
+	req, err = http.NewRequestWithContext(ctx, "GET", weatherUrl, nil)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
