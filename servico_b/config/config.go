@@ -1,6 +1,9 @@
 package config
 
-import "github.com/spf13/viper"
+import (
+	"github.com/spf13/viper"
+	"os"
+)
 
 type Conf struct {
 	WeatherToken string `mapstructure:"WEATHER_TOKEN"`
@@ -8,6 +11,12 @@ type Conf struct {
 }
 
 func LoadConfig(path string) (*Conf, error) {
+	if os.Getenv("ENV") == "PROD" {
+		return &Conf{
+			WeatherToken: os.Getenv("WEATHER_TOKEN"),
+			ExporterUrl:  os.Getenv("EXPORTER_URL"),
+		}, nil
+	}
 	viper.SetConfigName("app_config")
 	viper.SetConfigType("env")
 	viper.AddConfigPath(path)

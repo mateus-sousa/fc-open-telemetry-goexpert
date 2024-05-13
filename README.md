@@ -2,7 +2,7 @@ Passo a passo para execução da aplicação:
 
 * Para subir as dependencias do projeto execute o comando:
 ```
-    docker-compose up -d
+    docker-compose up -d --build
 ```
 A aplicação estará de pé respondendo nas seguintes portas:
 * Web Service A: 8080

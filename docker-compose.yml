@@ -8,6 +8,7 @@ services:
     environment:
       BASE_URL: http://service-b:8081
       EXPORTER_URL: http://zipkin:9411
+      ENV: 'PROD'
   service-b:
     ports:
       - "8081:8081"
@@ -16,6 +17,7 @@ services:
     environment:
       WEATHER_TOKEN: 'b31e34e7d8d842b4849182050243004'
       EXPORTER_URL: http://zipkin:9411
+      ENV: 'PROD'
   zipkin:
     image: openzipkin/zipkin:latest
     restart: always
