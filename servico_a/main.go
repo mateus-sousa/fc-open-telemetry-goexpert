@@ -88,7 +88,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	log.Println("request to service B susccesfully")
+	log.Println("request to service B susccessfully")
 	res, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
