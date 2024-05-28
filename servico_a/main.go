@@ -20,6 +20,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -151,6 +152,11 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
+	if res.StatusCode == http.StatusNotFound {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("can not find zipcode"))
+		return
+	}
 	requestServiceB.End()
 	ctx, httpResponseShow := tracer.Start(ctx, "http-response-show")
 	resBody, err := io.ReadAll(res.Body)
@@ -196,8 +202,13 @@ func handleResponse(w http.ResponseWriter, statusCode int, response *ResponseHTT
 	w.WriteHeader(http.StatusInternalServerError)
 }
 func validateCEP(cep CEP) error {
-	if len(cep.Number) != 8 {
+	if len(cep.Number) != 8 || !isNumeric(cep.Number) {
 		return errors.New("cep is invalid")
 	}
 	return nil
+}
+
+func isNumeric(s string) bool {
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
 }

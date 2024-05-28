@@ -207,6 +207,11 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
+	if responseViaCEP.Cep == "" {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("can not find zipcode"))
+		return
+	}
 	weatherUrl := fmt.Sprintf("http://api.weatherapi.com/v1/current.json?key=%s&q=%s",
 		cfg.WeatherToken,
 		url.QueryEscape(responseViaCEP.Localidade),
