@@ -5,8 +5,6 @@ import (
 	"os"
 )
 
-// OTEL_SERVICE_NAME: service-a
-// OTEL_EXPORTER_OTLP_ENDPOINT: otel:4317
 type Conf struct {
 	BaseUrl                  string `mapstructure:"BASE_URL"`
 	OtelServiceName          string `mapstructure:"OTEL_SERVICE_NAME"`
