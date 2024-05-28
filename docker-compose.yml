@@ -7,8 +7,11 @@ services:
       context: ./servico_a
     environment:
       BASE_URL: http://service-b:8081
-      EXPORTER_URL: http://zipkin:9411
       ENV: 'PROD'
+      OTEL_SERVICE_NAME: service-a
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel:4317
+    depends_on:
+      - otel
   service-b:
     ports:
       - "8081:8081"
@@ -16,23 +19,22 @@ services:
       context: ./servico_b
     environment:
       WEATHER_TOKEN: 'b31e34e7d8d842b4849182050243004'
-      EXPORTER_URL: http://zipkin:9411
       ENV: 'PROD'
-  zipkin:
-    image: openzipkin/zipkin:latest
-    restart: always
-    ports:
-      - "9411:9411"
-  otel-collector:
+      OTEL_SERVICE_NAME: service-b
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel:4317
+    depends_on:
+      - otel
+  otel:
     image: otel/opentelemetry-collector:latest
-    restart: always
-    command: [ "--config=/etc/otel-collector-config.yaml" ]
-    volumes:
-      - ./.docker/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/conf/otel-collector-config.yaml"]
+    privileged: true
     ports:
-      - "1888:1888"   # pprof extension
-      - "8888:8888"   # Prometheus metrics exposed by the collector
-      - "8889:8889"   # Prometheus exporter metrics
-      - "13133:13133" # health_check extension
-      - "4317:4317"   # OTLP gRPC receiver
-      - "55679:55679" # zpages extension
+      - 4317:4317
+      - 4318:4318
+    volumes:
+      - ./.docker/otel-collector-config.yaml:/conf/otel-collector-config.yaml
+  zipkin:
+    image: openzipkin/zipkin-slim
+    ports:
+      - 9411:9411
+    privileged: true

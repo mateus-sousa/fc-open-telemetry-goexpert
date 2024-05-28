@@ -2,18 +2,25 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_a/config"
-	"github.com/mateus-sousa/fc-open-telemetry-goexpert/servico_a/infra"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"log"
 	"net/http"
+	"time"
 )
 
 type CEP struct {
@@ -31,28 +38,75 @@ var cfg *config.Conf
 
 var tracer trace.Tracer
 
+func initProvider(serviceName, collectorURL string) (func(context.Context) error, error) {
+	ctx := context.Background()
+
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, collectorURL,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gRPC connection to collector: %w", err)
+	}
+
+	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create trace exporter: %w", err)
+	}
+
+	bsp := sdktrace.NewBatchSpanProcessor(traceExporter)
+	tracerProvider := sdktrace.NewTracerProvider(
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithResource(res),
+		sdktrace.WithSpanProcessor(bsp),
+	)
+	otel.SetTracerProvider(tracerProvider)
+
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	return tracerProvider.Shutdown, nil
+}
+
 func main() {
 	var err error
 	cfg, err = config.LoadConfig(".")
 	if err != nil {
 		log.Fatal(err)
 	}
-	ot := infra.NewOpenTel()
-	ot.ServiceName = "Service A"
-	ot.ServiceVersion = "1"
-	ot.ExporterEndpoint = fmt.Sprintf("%s/api/v2/spans", cfg.ExporterUrl)
-	tracer = ot.GetTracer()
+	ctx := context.Background()
+	log.Println("exporter data:", cfg.OtelServiceName, cfg.OtelExporterOtlpEndpoint)
+	shutdown, err := initProvider(cfg.OtelServiceName, cfg.OtelExporterOtlpEndpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := shutdown(ctx); err != nil {
+			log.Fatal("failed to shutdown TracerProvider: %w", err)
+		}
+	}()
+	tracer = otel.Tracer("microservice-tracer")
 	r := mux.NewRouter()
-	r.Use(otelmux.Middleware(ot.ServiceName))
 	r.HandleFunc("/getweather", getWeather)
 	fmt.Println("service B url:", cfg.BaseUrl)
-	fmt.Println("exporter url:", cfg.ExporterUrl)
 	fmt.Println("listening in port :8080")
 	http.ListenAndServe(":8080", r)
 }
 
 func getWeather(w http.ResponseWriter, r *http.Request) {
+	carrier := propagation.HeaderCarrier(r.Header)
 	ctx := r.Context()
+	ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
 	ctx, validateZipCode := tracer.Start(ctx, "validate-zipcode")
 	log.Println("init request")
 	body, err := io.ReadAll(r.Body)
@@ -80,7 +134,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	validateZipCode.End()
 	ctx, requestServiceB := tracer.Start(ctx, "request-service-b")
 	log.Println("request to service B")
-	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+	client := http.Client{}
 	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/getweather", cfg.BaseUrl), bytes.NewBuffer(body))
 	if err != nil {
 		log.Println(err)
@@ -89,6 +143,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Println("request to service B susccessfully")
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 	res, err := client.Do(req)
 	if err != nil {
 		log.Println(err)

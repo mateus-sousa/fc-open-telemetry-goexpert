@@ -5,16 +5,20 @@ import (
 	"os"
 )
 
+// OTEL_SERVICE_NAME: service-a
+// OTEL_EXPORTER_OTLP_ENDPOINT: otel:4317
 type Conf struct {
-	BaseUrl     string `mapstructure:"BASE_URL"`
-	ExporterUrl string `mapstructure:"EXPORTER_URL"`
+	BaseUrl                  string `mapstructure:"BASE_URL"`
+	OtelServiceName          string `mapstructure:"OTEL_SERVICE_NAME"`
+	OtelExporterOtlpEndpoint string `mapstructure:"OTEL_EXPORTER_OTLP_ENDPOINT"`
 }
 
 func LoadConfig(path string) (*Conf, error) {
 	if os.Getenv("ENV") == "PROD" {
 		return &Conf{
-			BaseUrl:     os.Getenv("BASE_URL"),
-			ExporterUrl: os.Getenv("EXPORTER_URL"),
+			BaseUrl:                  os.Getenv("BASE_URL"),
+			OtelServiceName:          os.Getenv("OTEL_SERVICE_NAME"),
+			OtelExporterOtlpEndpoint: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		}, nil
 	}
 	viper.SetConfigName("app_config")
